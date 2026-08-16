@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Admin Dashboard - Geo Attendance</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+    body { background: #0f172a; color: #f8fafc; min-height: 100vh; padding: 24px 16px; }
+    .container { max-width: 1100px; margin: 0 auto; }
+    .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; flex-wrap: wrap; gap: 12px; }
+    .title { font-size: 1.6rem; font-weight: 700; }
+    .btn-refresh { background: #0284c7; color: white; border: none; padding: 10px 20px; border-radius: 10px; cursor: pointer; font-weight: 600; }
+    .btn-refresh:hover { background: #0369a1; }
+    .table-card { background: #1e293b; border: 1px solid #334155; border-radius: 16px; overflow-x: auto; box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.3); }
+    table { width: 100%; border-collapse: collapse; text-align: left; }
+    th, td { padding: 16px 20px; border-bottom: 1px solid #334155; font-size: 0.95rem; }
+    th { background: #0f172a; color: #94a3b8; font-weight: 600; text-transform: uppercase; font-size: 0.75rem; letter-spacing: 0.05em; }
+    .user-badge { font-weight: 700; color: #38bdf8; }
+    .thumb { width: 56px; height: 56px; border-radius: 10px; object-fit: cover; border: 2px solid #38bdf8; }
+    .status-tag { display: inline-block; padding: 4px 12px; border-radius: 20px; font-size: 0.75rem; font-weight: 600; background: rgba(16, 185, 129, 0.15); color: #34d399; border: 1px solid #10b981; }
+    .empty-msg { text-align: center; padding: 48px; color: #64748b; font-size: 1rem; }
+  </style>
+</head>
+<body>
+
+<div class="container">
+  <div class="header">
+    <div class="title">Attendance Management Logs</div>
+    <button class="btn-refresh" onclick="fetchRecords()">Refresh Data</button>
+  </div>
+
+  <div class="table-card">
+    <table>
+      <thead>
+        <tr>
+          <th>Verification Photo</th>
+          <th>User / Student ID</th>
+          <th>Timestamp (IST)</th>
+          <th>Geofence Distance</th>
+          <th>Verification Status</th>
+        </tr>
+      </thead>
+      <tbody id="tableBody">
+        <tr><td colspan="5" class="empty-msg">Loading attendance records...</td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<script>
+  async function fetchRecords() {
+    const tbody = document.getElementById('tableBody');
+    try {
+      const res = await fetch('/api/admin/records');
+      const records = await res.json();
+
+      if (!records || records.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="5" class="empty-msg">No attendance logs recorded yet.</td></tr>';
+        return;
+      }
+
+      tbody.innerHTML = records.map(r => `
+        <tr>
+          <td>
+            <a href="${r.photoUrl}" target="_blank">
+              <img src="${r.photoUrl}" class="thumb" alt="Photo" />
+            </a>
+          </td>
+          <td><span class="user-badge">${r.userId}</span></td>
+          <td>${r.timestamp}</td>
+          <td>${r.distanceMeters} meters</td>
+          <td><span class="status-tag">Verified Present</span></td>
+        </tr>
+      `).join('');
+
+    } catch (err) {
+      tbody.innerHTML = '<tr><td colspan="5" class="empty-msg">Failed to retrieve records from server.</td></tr>';
+    }
+  }
+
+  fetchRecords();
+</script>
+</body>
+</html>

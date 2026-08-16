@@ -1,0 +1,5 @@
+node_modules/
+uploads/
+attendance_logs.json
+.DS_Store
+*.log

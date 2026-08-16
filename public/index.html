@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Smart Geo Attendance Portal</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
+    body { background: #0f172a; color: #f8fafc; min-height: 100vh; display: flex; justify-content: center; align-items: center; padding: 16px; }
+    .card { background: #1e293b; border: 1px solid #334155; border-radius: 20px; padding: 24px; width: 100%; max-width: 420px; box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5); }
+    .title { text-align: center; font-size: 1.5rem; font-weight: 700; color: #ffffff; margin-bottom: 6px; }
+    .subtitle { text-align: center; font-size: 0.85rem; color: #94a3b8; margin-bottom: 24px; }
+    .input-group { margin-bottom: 20px; }
+    .input-group label { display: block; font-size: 0.8rem; font-weight: 600; text-transform: uppercase; tracking: 0.05em; color: #cbd5e1; margin-bottom: 8px; }
+    .input-group input { width: 100%; padding: 14px 16px; background: #0f172a; border: 1px solid #334155; border-radius: 12px; color: #fff; font-size: 1rem; outline: none; transition: border-color 0.2s; }
+    .input-group input:focus { border-color: #38bdf8; }
+    .viewfinder { position: relative; width: 100%; aspect-ratio: 4/3; background: #0f172a; border: 2px dashed #334155; border-radius: 14px; overflow: hidden; display: flex; align-items: center; justify-content: center; margin-bottom: 20px; }
+    video, canvas { width: 100%; height: 100%; object-fit: cover; }
+    .placeholder-text { color: #64748b; font-size: 0.9rem; text-align: center; padding: 16px; line-height: 1.4; }
+    .btn { width: 100%; padding: 14px; border: none; border-radius: 12px; font-size: 1rem; font-weight: 600; cursor: pointer; transition: all 0.2s ease; margin-bottom: 12px; }
+    .btn-verify { background: #0284c7; color: white; }
+    .btn-verify:hover { background: #0369a1; }
+    .btn-submit { background: #10b981; color: white; }
+    .btn-submit:hover { background: #059669; }
+    .btn:disabled { background: #334155; color: #64748b; cursor: not-allowed; opacity: 0.6; }
+    .status-box { padding: 12px 16px; border-radius: 12px; font-size: 0.85rem; text-align: center; background: #0f172a; border: 1px solid #334155; color: #94a3b8; font-weight: 500; word-break: break-word; }
+    .status-box.success { background: rgba(16, 185, 129, 0.15); border-color: #10b981; color: #34d399; }
+    .status-box.error { background: rgba(239, 68, 68, 0.15); border-color: #ef4444; color: #f87171; }
+    .status-box.info { background: rgba(56, 189, 248, 0.15); border-color: #38bdf8; color: #38bdf8; }
+  </style>
+</head>
+<body>
+
+<div class="card">
+  <div class="title">Attendance Check-In</div>
+  <div class="subtitle">Location & Camera Verification</div>
+
+  <div class="input-group">
+    <label for="userId">Employee / Student ID</label>
+    <input type="text" id="userId" placeholder="Enter ID (e.g. EMP102)" required />
+  </div>
+
+  <div class="viewfinder">
+    <div id="placeholder" class="placeholder-text">
+      Tap <strong>"1. Grant Location & Camera"</strong> to activate verification.
+    </div>
+    <video id="webcam" autoplay playsinline style="display:none;"></video>
+    <canvas id="canvas" style="display:none;"></canvas>
+  </div>
+
+  <button id="verifyBtn" class="btn btn-verify" onclick="initiatePermissions()">1. Grant Location & Camera</button>
+  <button id="submitBtn" class="btn btn-submit" onclick="submitAttendance()" disabled>2. Capture & Submit</button>
+
+  <div id="status" class="status-box">Status: Awaiting input</div>
+</div>
+
+<script>
+  let coords = null;
+  const statusEl = document.getElementById('status');
+  const verifyBtn = document.getElementById('verifyBtn');
+  const submitBtn = document.getElementById('submitBtn');
+  const video = document.getElementById('webcam');
+  const placeholder = document.getElementById('placeholder');
+
+  function setStatus(msg, type) {
+    statusEl.className = `status-box ${type}`;
+    statusEl.innerText = msg;
+  }
+
+  function initiatePermissions() {
+    setStatus("Fetching GPS coordinates...", "info");
+    verifyBtn.disabled = true;
+
+    if (!navigator.geolocation) {
+      setStatus("Geolocation is unsupported by your browser.", "error");
+      verifyBtn.disabled = false;
+      return;
+    }
+
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        coords = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+        setStatus("GPS verified! Opening camera...", "info");
+        launchCamera();
+      },
+      (err) => {
+        setStatus("GPS access denied. Please enable location permissions in site settings.", "error");
+        verifyBtn.disabled = false;
+      },
+      { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
+    );
+  }
+
+  async function launchCamera() {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ 
+        video: { facingMode: "user", width: { ideal: 640 }, height: { ideal: 480 } } 
+      });
+      video.srcObject = stream;
+      placeholder.style.display = "none";
+      video.style.display = "block";
+      setStatus("GPS & Camera active. Click Submit.", "success");
+      submitBtn.disabled = false;
+    } catch (err) {
+      setStatus("Camera permission denied or camera unavailable.", "error");
+      verifyBtn.disabled = false;
+    }
+  }
+
+  async function submitAttendance() {
+    const userId = document.getElementById('userId').value.trim();
+    if (!userId) {
+      alert("Please enter your User ID first.");
+      return;
+    }
+
+    // Snap photo onto hidden canvas
+    const canvas = document.getElementById('canvas');
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    canvas.getContext('2d').drawImage(video, 0, 0);
+
+    const imageBase64 = canvas.toDataURL('image/jpeg', 0.85);
+
+    submitBtn.disabled = true;
+    setStatus("Verifying proximity and submitting...", "info");
+
+    try {
+      const response = await fetch('/api/mark-attendance', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userId: userId,
+          userLat: coords.lat,
+          userLng: coords.lng,
+          imageBase64: imageBase64
+        })
+      });
+
+      const resData = await response.json();
+
+      if (resData.success) {
+        setStatus(`Success! Attendance registered (${resData.distance}m from center).`, "success");
+      } else {
+        setStatus(`Rejected: ${resData.message}`, "error");
+        submitBtn.disabled = false;
+      }
+    } catch (err) {
+      setStatus("Failed to reach server. Check internet connection.", "error");
+      submitBtn.disabled = false;
+    }
+  }
+</script>
+</body>
+</html>
